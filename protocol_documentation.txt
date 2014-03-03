@@ -1,0 +1,72 @@
+BYTE - PACKET NUMBER
+BYTE - LENGTH
+
+01 { Initialize Connection
+	
+}
+
+02 { Start Processing
+	
+}
+
+03 { Stop Processing
+	
+}
+
+04 { Request Target Information
+	
+}
+
+05 { Target Information
+	BYTE - Target Count
+	Size: 20
+		DOUBLE - Normilized Center X (-1 to 1, left to right)
+		DOUBLE - Normalized Center Y (-1 to 1, bottom to top)
+		DOUBLE - X-angle to target
+		DOUBLE - Y-angle to target
+		DOUBLE - Angle of Target
+}
+
+06 { Setting values
+	BYTE - Value Type
+	01 { Brightness
+		BYTE - Brightness (0 to 255)
+	}
+	02 { Threshold
+		BYTE - Low Threshold (0 to 255)
+		BYTE - High Threshold (0 to 255)
+	}
+	03 { Competition Mode
+		BOOLEAN - Optimized Mode
+	}
+	04 { Set Video Recording
+		BOOLEAN - Video Recording
+	}
+	05 { Set Match Recording
+		BOOLEAN - Match Recording
+	}
+	06 { Set Width/Height
+		INT - Width
+		INT - Height
+	}
+}
+
+07 { Match Data
+	BYTE ARRAY - Data
+	Possible Data to be sent:
+		Match Time
+		Battery Voltage
+		Driver Station #
+		Alliance Color
+		Robot State (Enabled/Disabled)
+		Robot Mode (Auto/Tele/Test)
+		FMS Connected
+		Black Box Logging
+		Electrical Data:
+			Motor PWM Values
+			Digital I/O
+			Solenoid/Relay Values
+		Other:
+			Winch Position
+}
+
