@@ -1,0 +1,21 @@
+CFLAGS = `pkg-config --cflags opencv`
+LIBS = `pkg-config --libs opencv`
+OTHER = -L/usr/lib/uv4l/uv4lext/armv6l -L /usr/lib/arm-linux-gnueabihf/ -lwiringPi -luv4lext -lv4l2 -lraspivid -Wl,-rpath,'/usr/lib/uv4l/uv4lext/armv6l'
+OBJ = raspberry_pi_vision.o data_storage.o vision_processing/process.o
+
+# TODO: Test following without -pthread
+raspberry_pi_vision : $(OBJ)
+	g++ $(OTHER) $(LIBS) -g -pthread -o raspberry_pi_vision $(OBJ)
+
+raspberry_pi_vision.o : raspberry_pi_vision.cpp
+	g++ $(CFLAGS) -g -pthread -c -o raspberry_pi_vision.o raspberry_pi_vision.cpp
+
+data_storage.o : data_storage.cpp
+	g++ $(CFLAGS) -g -pthread -c -o data_storage.o data_storage.cpp
+
+vision_processing/process.o : vision_processing/process.cpp
+	g++ $(CFLAGS) -g -pthread -c -o vision_processing/process.o vision_processing/process.cpp
+
+clean:
+	rm -f $(OBJ) raspberry_pi_vision
+

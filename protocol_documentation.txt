@@ -70,3 +70,11 @@ BYTE - LENGTH
 			Winch Position
 }
 
+08 { Request Overall data
+}
+
+09 { Overall data
+	BOOLEAN - Left Hot Target
+	BOOLEAN - Right Hot Target
+}
+

@@ -1,7 +1,15 @@
 #include "data_storage.h"
 #include <iostream>
 #include <fstream>
+#include <raspicam/raspivid.h>
+
+// File output includes
+#include <fcntl.h>
+#include <sys/types.h>
+#include <unistd.h>
 using namespace std;
+
+DataStorage * DataStorage::DataStorageInstance = NULL;
 
 DataStorage::DataStorage() {
 	pthread_mutex_init(&brightnessImageMutex, NULL);
@@ -13,13 +21,27 @@ DataStorage::DataStorage() {
 	videoFile = -1;
 	matchFile = -1;
 	visionRestart = false;
+	saveData = new SaveData();
+	data = new USERDATA();
 }
 
 DataStorage::~DataStorage() {
+	delete saveData;
 	if (videoFile != -1)
 		close(videoFile);
 	if (matchFile != -1)
 		close(matchFile);
+}
+
+DataStorage & DataStorage::Get() {
+	if (DataStorageInstance == NULL) {
+		DataStorageInstance = new DataStorage(); // 'cause I'm LAAAZZYYYY
+	}
+	return *DataStorageInstance;
+}
+
+USERDATA * DataStorage::getUserdata() {
+	return data;
 }
 
 void DataStorage::openSaveData(const char * saveFile) {
@@ -29,11 +51,11 @@ void DataStorage::openSaveData(const char * saveFile) {
 		readSaveData();
 	} else {
 		cout << "Save file does not exist at '" << saveFile << "', creating!\n";
-		saveData.brightness = 50;
-		saveData.threshMin = 1;
-		saveData.threshMax = 255;
-		saveData.width = 640;
-		saveData.height = 480;
+		saveData->brightness = 50;
+		saveData->threshMin = 1;
+		saveData->threshMax = 255;
+		saveData->width = 640;
+		saveData->height = 480;
 		writeSaveData();
 	}
 }
@@ -66,6 +88,10 @@ void DataStorage::closeVideoFile() {
 	videoFile = -1;
 }
 
+bool DataStorage::isVideoFileOpened() {
+	return videoFile != -1;
+}
+
 void DataStorage::openMatchFile(const char * matchFilename) {
 	matchFile = open(matchFilename, O_WRONLY|O_CREAT|O_TRUNC);
 }
@@ -82,6 +108,10 @@ void DataStorage::closeMatchFile() {
 	matchFile = -1;
 }
 
+bool DataStorage::isMatchFileOpened() {
+	return matchFile != -1;
+}
+
 bool DataStorage::fileExists(const char * filename) {
 	ifstream fileTest(filename);
 	bool ret = false;
@@ -94,21 +124,31 @@ bool DataStorage::fileExists(const char * filename) {
 void DataStorage::writeSaveData() {
 	if (saveFilename == "")
 		return;
-	ofstream OUTPUT;
-	OUTPUT.open(saveFilename.c_str(), ios::out | ios::binary);
-	OUTPUT.write((const char *)&saveData, sizeof(&saveData));
-	OUTPUT.close();
+	int output = open(saveFilename.c_str(), O_WRONLY|O_CREAT|O_TRUNC);
+	if (output != -1) {
+		writeToFile(output, (unsigned char *)saveData, sizeof(saveData));
+		close(output);
+		output = -1;
+	}
 }
 
 void DataStorage::readSaveData() {
-	ifstream INPUT;
-	INPUT.open(saveFilename, ios::in | ios::binary);
-	INPUT.read((char *)&saveData, sizeof(&saveData));
-	INPUT.close();
+	int input = open(saveFilename.c_str(), O_RDONLY);
+	unsigned char * data = (unsigned char *)saveData;
+	int bytesRead = 0;
+	int length = sizeof(saveData);
+	while (length > 0) {
+		bytesRead = read(input, data, length);
+		length -= bytesRead;
+		data += bytesRead;
+		if (bytesRead <= 0)
+			break;
+	}
+	close(input);
 }
 
 SaveData * DataStorage::getSaveData() {
-	return &saveData;
+	return saveData;
 }
 
 void DataStorage::setCompetitionMode(bool mode) {

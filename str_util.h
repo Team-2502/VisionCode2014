@@ -1,27 +1,12 @@
-#ifndef MISC_H
-#define MISC_H
+#ifndef STR_UTIL_H
+#define STR_UTIL_H
 
-#include <raspicam/raspivid.h>
-#include <sys/time.h>
+#include <stdio.h>
 #include <string.h>
-#include <iostream>
-#include <iomanip>
-#include <cmath>
+
+#include "data_storage.h"
 
 using namespace std;
-
-#define PI 3.1415926535
-#define STATUS_INITIALIZING 1
-#define STATUS_RUNNING 2
-#define STATUS_STOPPED 4
-#define STATUS_CAPTURING 8
-#define STATUS_CALIBRATING 16
-
-unsigned long getmsofday() {
-   struct timeval tv;
-   gettimeofday(&tv, NULL);
-   return (long long)tv.tv_sec*1000 + tv.tv_usec/1000;
-}
 
 int str2int(const char * a) {
 	//stringstream ss; ss << a; int i = 0; ss >> i;
@@ -62,11 +47,4 @@ string strtolower(string str) {
 	return ret;
 }
 
-/*
- * Global Variables
- */
-
-DataStorage globalStorage;
-USERDATA * data;
-
-#endif // MISC_H
+#endif // STR_UTIL_H

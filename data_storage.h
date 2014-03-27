@@ -1,53 +1,24 @@
 #ifndef DATA_STORAGE_H
 #define DATA_STORAGE_H
-#include <opencv2/objdetect/objdetect.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/core/core.hpp>
 #include <vector>
+
+#include "types.h"
 using namespace std;
-
-typedef struct {
-	int x;
-	int y;
-} CalibrateTarget;
-
-typedef struct {
-	int brightness;
-	int threshMin;
-	int threshMax;
-	float score;
-} Calibration;
-
-typedef struct {
-	float x;
-	float y;
-	int width;
-	int height;
-	cv::Point2f points[4];
-	float ratio;
-	float angle;
-	float area;
-	float dist; // Distance to Target
-	float distError; // Estimated error in the distance calculation
-} Target;
-
-typedef struct {
-	int brightness;
-	int threshMin;
-	int threshMax;
-	int width;
-	int height;
-} SaveData;
 
 class DataStorage {
 	private:
+	static DataStorage * DataStorageInstance;
+	
+	DataStorage();
+	USERDATA * data;
 	volatile bool visionRestart;
 	volatile bool competitionMode;
 	volatile bool gameRecording;
 	int videoFile;
 	int matchFile;
 	string saveFilename;
-	SaveData saveData;
+	SaveData * saveData;
 	vector <Target> targets;
 	vector <CalibrateTarget> calTargets;
 	cv::Mat brightnessImage;
@@ -67,20 +38,25 @@ class DataStorage {
 	bool writeToFile(int filePtr, unsigned char * data, unsigned int length);
 	
 	public:
-	DataStorage();
 	~DataStorage();
+	
+	static DataStorage & Get();
 	
 	void openSaveData(const char * saveFile);
 	void writeSaveData();
 	SaveData * getSaveData();
 	
+	USERDATA * getUserdata();
+	
 	void openVideoFile(const char * videoFilename);
 	bool writeToVideoFile(unsigned char * data, unsigned int length);
 	void closeVideoFile();
+	bool isVideoFileOpened();
 	
 	void openMatchFile(const char * matchFilename);
 	bool writeToMatchFile(unsigned char * data, unsigned int length);
 	void closeMatchFile();
+	bool isMatchFileOpened();
 	
 	void setVisionRestart(bool restart);
 	volatile bool isVisionRestarting();
@@ -111,4 +87,4 @@ class DataStorage {
 	
 };
 
-#endif
+#endif // DATA_STORAGE_H

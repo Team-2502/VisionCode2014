@@ -1,18 +1,36 @@
 #include "communication/tcp_communications.h"
-#include "data_storage.cpp"
-#include "misc.h"
+#include "communication/wire_communications.h"
+#include "data_storage.h"
+#include "str_util.h"
+#include "time_util.h"
 #include "vision_processing/process.h"
 
+// RaspiVid
+#include <raspicam/raspivid.h>
+
+// I/O
+#include <iostream>
+#include <iomanip>
+#include <sys/stat.h>
+using namespace cv;
+
+string FILEPATH = "/home/josh/devel/RPi2014/match_data/";
 RaspiVid * v = NULL;
 
 int initialize() {
 	// Global Initialization
-	data = new USERDATA;
-	data->status = STATUS_INITIALIZING;
+	DataStorage::Get().getUserdata()->status = STATUS_INITIALIZING;
 	
 	// Load Vision Data
-	data->width = globalStorage.getSaveData()->width;
-	data->height = globalStorage.getSaveData()->height;
+	DataStorage::Get().getUserdata()->width = DataStorage::Get().getSaveData()->width;
+	DataStorage::Get().getUserdata()->height = DataStorage::Get().getSaveData()->height;
+	
+	// Create /dev/video0
+	struct stat buffer;
+	if (stat("/dev/video0", &buffer) != 0)
+		system("sudo uv4l --sched-rr --driver raspicam --device-name=video0 --width 640 --height 480 --encoding yuv420 --nopreview --imgfx blur --awb off --framerate 30");
+	if (configureWire())
+		return -1;
 	return 0;
 }
 
@@ -23,30 +41,75 @@ int initializeVision(int width, int height) {
 	}
 	// Initializes Camera
 	v = new RaspiVid("/dev/video0", width, height);
-	data->vision = v;
+	DataStorage::Get().getUserdata()->vision = v;
 	cout << "Initializing...\n";
-	if (!v->initialize(RaspiVid::METHOD_MMAP)) {
-		cout << "Could not initialize, attempting to create a new /dev/video\n";
-		system("sudo uv4l --sched-rr --driver raspicam --auto-video_nr --width 640 --height 480 --encoding yuv420 --nopreview --imgfx blur --awb off --framerate 30");
-		if (!v->initialize(RaspiVid::METHOD_MMAP)) {
-			cout << "Yeah, didn't work. Failed!\n";
-			return -1;
-		} else {
-			cout << "AND I RECOVER!\n";
-		}
-		return 0;
-	}
-	v->setBrightness(globalStorage.getSaveData()->brightness);
+	if (!v->initialize(RaspiVid::METHOD_MMAP))
+		return -1;
+	v->setBrightness(DataStorage::Get().getSaveData()->brightness);
+	if (DataStorage::Get().getSaveData()->threshMin == 0 || DataStorage::Get().getSaveData()->threshMin > 50)
+		DataStorage::Get().getSaveData()->threshMin = 1;
+	if (DataStorage::Get().getSaveData()->threshMax < 200)
+		DataStorage::Get().getSaveData()->threshMax = 255;
 	v->startCapturing();
 }
 
+void iterativeVisionLoop(int width, int height, long frame, bool & lastStartProcessingValue, RaspiVid * v) {
+	VideoBuffer buffer = v->grabFrame();
+	if (buffer.length() == 0 || buffer.data() == NULL) {
+		cout << "Invalid buffer length or invalid buffer data pointer\n";
+		return;
+	}
+	
+	vector <Target> targets = processAndGetTargets(width, height, buffer.data());
+	DataStorage::Get().setTargets(targets);
+	bool hot = false;
+	for (int i = 0; i < targets.size() && !hot; i++) {
+		if (targets[i].hotTarget)
+			hot = true;
+	}
+	setHotWire(hot);
+	if (lastStartProcessingValue != isProcessingStarted()) {
+		lastStartProcessingValue = !lastStartProcessingValue;
+		if (lastStartProcessingValue) {
+			v->setBrightness(3);
+		} else {
+			v->setBrightness(50);
+		}
+	}
+	if (!DataStorage::Get().isCompetitionMode()) {
+		if (frame % 15 == 0) {
+			showClientImage();
+		}
+	} else {
+		if (DataStorage::Get().isGameRecording()) {
+			if (!DataStorage::Get().isVideoFileOpened()) {
+				cout << "Opening Video File\n";
+				string videoOutputPath = FILEPATH.c_str();
+				videoOutputPath.append("video_output.bin");
+				DataStorage::Get().openVideoFile(videoOutputPath.c_str());
+				system(string("chmod 777 ").append(videoOutputPath).c_str());
+			}
+			cout << "Writing To Video File\n";
+			unsigned char time[8];
+			*((long*)&time[0]) = getmsofday();
+			DataStorage::Get().writeToVideoFile(time, 8);
+			DataStorage::Get().writeToVideoFile(buffer.data(), buffer.length());
+		}
+	}
+}
+
 int main(int argc, char *argv[]) {
-	globalStorage.setCompetitionMode(false);
-	globalStorage.setGameRecording(false);
-	globalStorage.openSaveData("server_data.bin");
-	globalStorage.writeSaveData();
-	globalStorage.openVideoFile("video_output.bin");
-	globalStorage.openMatchFile("match_output.bin");
+	DataStorage::Get().setCompetitionMode(true);
+	DataStorage::Get().setGameRecording(false);
+	string saveDataPath = FILEPATH.c_str();
+	string matchOutputPath = FILEPATH.c_str();
+	saveDataPath.append("server_data.bin");
+	matchOutputPath.append("match_output.bin");
+	DataStorage::Get().openSaveData(saveDataPath.c_str());
+	DataStorage::Get().openMatchFile(matchOutputPath.c_str());
+	system(string("chmod 777 ").append(saveDataPath).c_str());
+	system(string("chmod 777 ").append(matchOutputPath).c_str());
+	DataStorage::Get().writeSaveData();
 	
 	if (initialize() != 0)
 		return -1;
@@ -55,64 +118,36 @@ int main(int argc, char *argv[]) {
 	long startFrame = getmsofday();
 	bool running = true;
 	
-	cout << "Capturing...\n";
-	
 	pthread_t pCommunicationThread;
 	pthread_create(&pCommunicationThread, NULL, &tcp_communications, NULL);
-	globalStorage.getSaveData()->width = 640;
-	globalStorage.getSaveData()->height = 480;
+	DataStorage::Get().getSaveData()->width = 640;
+	DataStorage::Get().getSaveData()->height = 480;
 	do {
-		int width = globalStorage.getSaveData()->width;
-		int height = globalStorage.getSaveData()->height;
+		int width = 640;//DataStorage::Get().getSaveData()->width;
+		int height = 480;//DataStorage::Get().getSaveData()->height;
 		if (initializeVision(width, height) != 0) {
 			cout << "Failed to initialize. I give up.\n";
 			running = false;
 			continue;
 		}
-		globalStorage.setVisionRestart(false);
-		for (unsigned int frame = 0; !globalStorage.isVisionRestarting(); frame++) {
-			VideoBuffer buffer = v->grabFrame();
-			if (buffer.length() == 0 || buffer.data() == NULL) {
-				cout << "Invalid buffer length or invalid buffer data pointer\n";
-				continue;
-			}
-			
-			Mat image(height, width, CV_8UC1, buffer.data(), false);
-			Mat thresh;
-			inRange(image, Scalar(globalStorage.getSaveData()->threshMin), Scalar(globalStorage.getSaveData()->threshMax), thresh);
-			vector <vector<Point> > contours;
-			findContours(thresh, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
-			vector <Target> targets = processAndGetTargets(contours);
-			globalStorage.setTargets(targets);
-			
+		cout << "Capturing at " << width << "x" << height << "\n";
+		DataStorage::Get().setVisionRestart(false);
+		bool lastStartProcessingValue = false;
+		for (unsigned int frame = 0; !DataStorage::Get().isVisionRestarting(); frame++) {
+			iterativeVisionLoop(width, height, frame, lastStartProcessingValue, v);
 			long endFrame = getmsofday();
 			long diffFrame = endFrame - startFrame;
 			startFrame = endFrame;
 			if (averageFrame == -1) averageFrame = diffFrame; else averageFrame = averageFrame*.9 + diffFrame*.1;
-			data->framerate = 1000.0 / averageFrame;
-			if (frame % 10 == 0) {
+			DataStorage::Get().getUserdata()->framerate = 1000.0 / averageFrame;
+			if (frame % 10 == 0)
 				cout << setprecision(2) << "\rFrame: #" << frame << "\t" << averageFrame << "ms    " << (1000.0 / averageFrame) << " FPS          ";
-				cout.flush();
-				if (globalStorage.isGameRecording()) {
-					globalStorage.writeToVideoFile(buffer.data(), buffer.length());
-				}
-			}
-			if (!globalStorage.isCompetitionMode()) {
-				if (frame % 15 == 0) {
-					waitKey(1);
-					Mat img = image.clone();
-					for (unsigned int i = 0; i < targets.size(); i++) {
-						for (unsigned int j = 0; j < 4; j++)
-							line(img, targets[i].points[j], targets[i].points[(j+1)%4], Scalar(255), 1, 8);
-					}
-					imshow("Frame", img);
-				}
-			}
 		}
 	} while (running);
+	cout << "Closing...\n";
 	delete v;
-	globalStorage.closeVideoFile();
-	globalStorage.closeMatchFile();
+	DataStorage::Get().closeVideoFile();
+	DataStorage::Get().closeMatchFile();
 	return 0;
 }
 
