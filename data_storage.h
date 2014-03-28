@@ -17,6 +17,8 @@ class DataStorage {
 	volatile bool gameRecording;
 	int videoFile;
 	int matchFile;
+	unsigned long videoFileOutBytes;
+	unsigned long matchFileOutBytes;
 	string saveFilename;
 	SaveData * saveData;
 	vector <Target> targets;
@@ -52,11 +54,13 @@ class DataStorage {
 	bool writeToVideoFile(unsigned char * data, unsigned int length);
 	void closeVideoFile();
 	bool isVideoFileOpened();
+	unsigned int getVideoFileSize();
 	
 	void openMatchFile(const char * matchFilename);
 	bool writeToMatchFile(unsigned char * data, unsigned int length);
 	void closeMatchFile();
 	bool isMatchFileOpened();
+	unsigned int getMatchFileSize();
 	
 	void setVisionRestart(bool restart);
 	volatile bool isVisionRestarting();

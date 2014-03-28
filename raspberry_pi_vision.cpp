@@ -45,7 +45,7 @@ int initializeVision(int width, int height) {
 	cout << "Initializing...\n";
 	if (!v->initialize(RaspiVid::METHOD_MMAP))
 		return -1;
-	v->setBrightness(DataStorage::Get().getSaveData()->brightness);
+	v->setBrightness(4);
 	if (DataStorage::Get().getSaveData()->threshMin == 0 || DataStorage::Get().getSaveData()->threshMin > 50)
 		DataStorage::Get().getSaveData()->threshMin = 1;
 	if (DataStorage::Get().getSaveData()->threshMax < 200)
@@ -53,7 +53,7 @@ int initializeVision(int width, int height) {
 	v->startCapturing();
 }
 
-void iterativeVisionLoop(int width, int height, long frame, bool & lastStartProcessingValue, RaspiVid * v) {
+void iterativeVisionLoop(int width, int height, long frame, RaspiVid * v) {
 	VideoBuffer buffer = v->grabFrame();
 	if (buffer.length() == 0 || buffer.data() == NULL) {
 		cout << "Invalid buffer length or invalid buffer data pointer\n";
@@ -68,13 +68,10 @@ void iterativeVisionLoop(int width, int height, long frame, bool & lastStartProc
 			hot = true;
 	}
 	setHotWire(hot);
-	if (lastStartProcessingValue != isProcessingStarted()) {
-		lastStartProcessingValue = !lastStartProcessingValue;
-		if (lastStartProcessingValue) {
-			v->setBrightness(3);
-		} else {
-			v->setBrightness(50);
-		}
+	if (isProcessingStarted()) {
+		v->setBrightness(4);
+	} else {
+		v->setBrightness(50);
 	}
 	if (!DataStorage::Get().isCompetitionMode()) {
 		if (frame % 15 == 0) {
@@ -83,24 +80,26 @@ void iterativeVisionLoop(int width, int height, long frame, bool & lastStartProc
 	} else {
 		if (DataStorage::Get().isGameRecording()) {
 			if (!DataStorage::Get().isVideoFileOpened()) {
-				cout << "Opening Video File\n";
 				string videoOutputPath = FILEPATH.c_str();
 				videoOutputPath.append("video_output.bin");
+				system(string("echo mv ").append(videoOutputPath).append(" ").append(FILEPATH.c_str()).append("video_output_bak.bin").c_str());
+				system(string("mv ").append(videoOutputPath).append(" ").append(FILEPATH.c_str()).append("video_output_bak.bin").c_str());
 				DataStorage::Get().openVideoFile(videoOutputPath.c_str());
 				system(string("chmod 777 ").append(videoOutputPath).c_str());
 			}
-			cout << "Writing To Video File\n";
-			unsigned char time[8];
-			*((long*)&time[0]) = getmsofday();
-			DataStorage::Get().writeToVideoFile(time, 8);
-			DataStorage::Get().writeToVideoFile(buffer.data(), buffer.length());
+			if (DataStorage::Get().getVideoFileSize() < 3.5 * 1024 * 1024 * 1024) {
+				unsigned char time[8];
+				*((long*)&time[0]) = getmsofday();
+				DataStorage::Get().writeToVideoFile(time, 8);
+				DataStorage::Get().writeToVideoFile(buffer.data(), buffer.length());
+			}
 		}
 	}
 }
 
 int main(int argc, char *argv[]) {
 	DataStorage::Get().setCompetitionMode(true);
-	DataStorage::Get().setGameRecording(false);
+	DataStorage::Get().setGameRecording(true);
 	string saveDataPath = FILEPATH.c_str();
 	string matchOutputPath = FILEPATH.c_str();
 	saveDataPath.append("server_data.bin");
@@ -134,7 +133,7 @@ int main(int argc, char *argv[]) {
 		DataStorage::Get().setVisionRestart(false);
 		bool lastStartProcessingValue = false;
 		for (unsigned int frame = 0; !DataStorage::Get().isVisionRestarting(); frame++) {
-			iterativeVisionLoop(width, height, frame, lastStartProcessingValue, v);
+			iterativeVisionLoop(width, height, frame, v);
 			long endFrame = getmsofday();
 			long diffFrame = endFrame - startFrame;
 			startFrame = endFrame;

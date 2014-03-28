@@ -20,6 +20,8 @@ DataStorage::DataStorage() {
 	pthread_mutex_init(&targetImageMutex, NULL);
 	videoFile = -1;
 	matchFile = -1;
+	videoFileOutBytes = 0;
+	matchFileOutBytes = 0;
 	visionRestart = false;
 	saveData = new SaveData();
 	data = new USERDATA();
@@ -79,6 +81,7 @@ void DataStorage::openVideoFile(const char * videoFilename) {
 bool DataStorage::writeToVideoFile(unsigned char * data, unsigned int length) {
 	if (videoFile == -1)
 		return false;
+	videoFileOutBytes += length;
 	return writeToFile(videoFile, data, length);
 }
 
@@ -92,6 +95,10 @@ bool DataStorage::isVideoFileOpened() {
 	return videoFile != -1;
 }
 
+unsigned int DataStorage::getVideoFileSize() {
+	return videoFileOutBytes;
+}
+
 void DataStorage::openMatchFile(const char * matchFilename) {
 	matchFile = open(matchFilename, O_WRONLY|O_CREAT|O_TRUNC);
 }
@@ -99,6 +106,7 @@ void DataStorage::openMatchFile(const char * matchFilename) {
 bool DataStorage::writeToMatchFile(unsigned char * data, unsigned int length) {
 	if (videoFile == -1)
 		return false;
+	matchFileOutBytes += length;
 	return writeToFile(matchFile, data, length);
 }
 
@@ -110,6 +118,10 @@ void DataStorage::closeMatchFile() {
 
 bool DataStorage::isMatchFileOpened() {
 	return matchFile != -1;
+}
+
+unsigned int DataStorage::getMatchFileSize() {
+	return matchFileOutBytes;
 }
 
 bool DataStorage::fileExists(const char * filename) {

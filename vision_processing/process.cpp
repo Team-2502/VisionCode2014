@@ -35,7 +35,7 @@ bool isHotTarget(Target a, Target b) {
 	int width = 640;//DataStorage::Get().getSaveData()->width;
 	int height = 480;//DataStorage::Get().getSaveData()->height;
 	double dist = targetDistance(a, b) / ((width > height) ? width : height);
-	if (angDiff >= 60 && dist >= .15) {
+	if (angDiff >= 80 && dist >= .15 && dist <= .4) {
 		if (b.x > a.x && a.y > b.y) {
 			return true;
 		} else if (b.x < a.x && a.y > b.y) {

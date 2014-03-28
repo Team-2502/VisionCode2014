@@ -2,8 +2,8 @@
 #define WIRE_COMMUNICATIONS_H
 #include <wiringPi.h>
 
-#define GPIO_OUTPUT 0
-#define GPIO_INPUT 1
+#define GPIO_OUTPUT 1
+#define GPIO_INPUT 0
 
 int configureWire() {
 	if (wiringPiSetup () == -1)
