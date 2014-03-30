@@ -60,17 +60,19 @@ void iterativeVisionLoop(int width, int height, long frame, RaspiVid * v) {
 		return;
 	}
 	
-	vector <Target> targets = processAndGetTargets(width, height, buffer.data());
-	DataStorage::Get().setTargets(targets);
-	bool hot = false;
-	for (int i = 0; i < targets.size() && !hot; i++) {
-		if (targets[i].hotTarget)
-			hot = true;
-	}
-	setHotWire(hot);
 	if (isProcessingStarted()) {
 		v->setBrightness(4);
+		vector <Target> targets = processAndGetTargets(width, height, buffer.data());
+		DataStorage::Get().setTargets(targets);
+		bool hot = false;
+		for (int i = 0; i < targets.size() && !hot; i++) {
+			if (targets[i].hotTarget)
+				hot = true;
+		}
+		setHotWire(hot);
 	} else {
+		Mat image(height, width, CV_8UC1, buffer.data(), false);
+		DataStorage::Get().setBrightnessImage(image);
 		v->setBrightness(50);
 	}
 	if (!DataStorage::Get().isCompetitionMode()) {
@@ -82,8 +84,8 @@ void iterativeVisionLoop(int width, int height, long frame, RaspiVid * v) {
 			if (!DataStorage::Get().isVideoFileOpened()) {
 				string videoOutputPath = FILEPATH.c_str();
 				videoOutputPath.append("video_output.bin");
-				system(string("echo mv ").append(videoOutputPath).append(" ").append(FILEPATH.c_str()).append("video_output_bak.bin").c_str());
-				system(string("mv ").append(videoOutputPath).append(" ").append(FILEPATH.c_str()).append("video_output_bak.bin").c_str());
+				system(string("echo mv -f ").append(videoOutputPath).append(" ").append(FILEPATH.c_str()).append("video_output_bak.bin").c_str());
+				system(string("mv -f ").append(videoOutputPath).append(" ").append(FILEPATH.c_str()).append("video_output_bak.bin").c_str());
 				DataStorage::Get().openVideoFile(videoOutputPath.c_str());
 				system(string("chmod 777 ").append(videoOutputPath).c_str());
 			}

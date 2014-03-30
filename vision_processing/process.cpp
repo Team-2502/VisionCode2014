@@ -21,7 +21,7 @@ using namespace std;
 using namespace cv;
 
 bool passesFilter(Target t) {
-	if (t.ratio <= 4 || t.ratio >= 9 || t.width < 20 || t.height < 5)
+	if (t.ratio <= 4 || t.ratio >= 10 || t.width < 20 || t.height < 20)
 		return false;
 	return true;
 }
@@ -35,10 +35,12 @@ bool isHotTarget(Target a, Target b) {
 	int width = 640;//DataStorage::Get().getSaveData()->width;
 	int height = 480;//DataStorage::Get().getSaveData()->height;
 	double dist = targetDistance(a, b) / ((width > height) ? width : height);
-	if (angDiff >= 80 && dist >= .15 && dist <= .4) {
-		if (b.x > a.x && a.y > b.y) {
+	int heightDiff = abs(a.height - b.height);
+	cout << "HeightDiff: " << heightDiff << "   AngDiff: " << angDiff << "  AR: " << a.ratio << "  BR: " << b.ratio << "  Dist: " << dist << "\n";
+	if (angDiff >= 75 && dist <= .4 && a.ratio < b.ratio && heightDiff < 5) {
+		if (b.x > a.x && a.y < b.y) {
 			return true;
-		} else if (b.x < a.x && a.y > b.y) {
+		} else if (b.x < a.x && a.y < b.y) {
 			return true;
 		}
 	}
@@ -149,6 +151,9 @@ void showClientImage() {
 	vector <Target> targets = DataStorage::Get().getTargets();
 	Mat img = DataStorage::Get().copyBrightnessImage();
 	for (unsigned int i = 0; i < targets.size(); i++) {
+		if (targets[i].hotTarget) {
+			circle(img, cvPoint(targets[i].x, targets[i].y), 5, Scalar(255));
+		}
 		for (unsigned int j = 0; j < 4; j++) {
 			Point2f cur = cvPoint(targets[i].pointsX[j], targets[i].pointsY[j]);
 			Point2f next = cvPoint(targets[i].pointsX[(j+1)%4], targets[i].pointsY[(j+1)%4]);
